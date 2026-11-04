@@ -1,5 +1,9 @@
-# CloudNova – Nginx (Tier 1): statische Auslieferung + Reverse Proxy zur API
-# Läuft mit dem Image "nginx-unprivileged" als Benutzer "nginx" (Port 8080, kein Root).
+# CloudNova: Nginx (Tier 1), statische Auslieferung und Reverse Proxy zur API.
+# Dies ist ein Template: Das Image ersetzt ${BACKEND_UPSTREAM} beim Start per envsubst
+# und schreibt das Ergebnis nach /etc/nginx/conf.d/default.conf.
+#   Variante A (alles auf einem Host): BACKEND_UPSTREAM=http://backend:3000 (Standard)
+#   Variante B (drei PCs):             BACKEND_UPSTREAM=http://<Tailscale-IP-Backend-PC>:3000
+# Läuft mit nginx-unprivileged als Benutzer "nginx" auf Port 8080 (kein Root).
 server {
     listen 8080;
     server_name _;
@@ -15,12 +19,12 @@ server {
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
 
-    # Reverse Proxy zur API. Docker-DNS (127.0.0.11) wird zur Laufzeit befragt, damit
+    # Reverse Proxy zur API. Der Docker-DNS (127.0.0.11) wird zur Laufzeit befragt, damit
     # "docker compose up --scale backend=3" funktioniert (Round-Robin über alle Backend-Instanzen)
     # und Nginx auch startet, wenn das Backend kurz nicht erreichbar ist.
     location /api/ {
         resolver 127.0.0.11 valid=5s ipv6=off;
-        set $backend_upstream http://backend:3000;
+        set $backend_upstream ${BACKEND_UPSTREAM};
         proxy_pass $backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

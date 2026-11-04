@@ -2,7 +2,9 @@
 # CloudNova – automatisierter Smoke-Test (Git Bash / Linux / macOS)
 # Aufruf im Projektordner:  bash scripts/smoke-test.sh
 cd "$(dirname "$0")/.." || exit 1
-BASE="http://localhost:${FRONTEND_PORT:-8080}"
+set -a; . ./.env; set +a
+# Das Frontend lauscht auf FRONTEND_BIND (127.0.0.1 oder Tailscale-IP), nicht zwingend auf localhost.
+BASE="http://${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-8080}"
 PASS=0; FAIL=0
 check() { # Beschreibung, Bedingung (0 = ok)
   if [ "$2" -eq 0 ]; then echo "  [OK]   $1"; PASS=$((PASS+1)); else echo "  [FAIL] $1"; FAIL=$((FAIL+1)); fi
