@@ -1,0 +1,108 @@
+# CloudNova – 3-Tier-Produktkatalog (Frontend / Backend / Datenbank)
+# Start:  docker compose up -d --build
+# Alle Werte stammen aus der Datei ".env" (Vorlage: ".env.example").
+name: cloudnova
+
+services:
+  # ───────────── Tier 3: Datenbank ─────────────
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB fehlt in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER fehlt in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env}
+      APP_DB_USER: ${APP_DB_USER:?APP_DB_USER fehlt in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD fehlt in .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data          # persistent: Daten überleben Neustarts
+      - ./database/init:/docker-entrypoint-initdb.d:ro   # Schema + Seed nur beim ersten Start
+    networks:
+      - database_net                              # NUR im internen Datenbanknetz
+    # KEIN "ports:" – die Datenbank wird nicht auf dem Host veröffentlicht.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]   # Minimum für den Postgres-Entrypoint
+    pids_limit: 200
+
+  # ───────────── Tier 2: Backend (Node.js / Express) ─────────────
+  backend:
+    build: ./backend
+    image: cloudnova/backend:1.0
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DB_HOST: database
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${APP_DB_USER}          # eingeschränkter Benutzer (nur SELECT)
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    depends_on:
+      database:
+        condition: service_healthy     # Backend startet erst, wenn die DB bereit ist
+    networks:
+      - frontend_net                   # erreichbar für Nginx
+      - database_net                   # erreicht die Datenbank
+    # KEIN "ports:" und kein container_name -> per Nginx-Proxy erreichbar und skalierbar (--scale backend=3)
+    expose:
+      - "3000"
+    read_only: true                    # Root-Dateisystem schreibgeschützt
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 100
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 4s
+      retries: 3
+      start_period: 10s
+
+  # ───────────── Tier 1: Frontend (Nginx) ─────────────
+  frontend:
+    build: ./frontend
+    image: cloudnova/frontend:1.0
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # Standard: nur lokal (127.0.0.1). Für Tailscale: FRONTEND_BIND=<Tailscale-IP> in .env setzen.
+      - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-8080}:8080"
+    networks:
+      - frontend_net
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 100
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/nginx-health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  frontend_net:
+    driver: bridge
+  database_net:
+    driver: bridge
+    internal: true       # kein Zugang nach aussen: weder Internet noch Host-Ports
+
+volumes:
+  db_data:

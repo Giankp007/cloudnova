@@ -1,0 +1,21 @@
+# Geheimnisse und lokale Konfiguration
+.env
+*.pem
+*.key
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# IDE-Konfigurationen (persönlich)
+.idea/
+*.iml
+.vscode/
+
+# Temporäre Dateien / Betriebssystem
+*.log
+*.tmp
+~$*
+Thumbs.db
+.DS_Store
+docs/screenshots/*.tmp

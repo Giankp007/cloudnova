@@ -1,0 +1,17 @@
+{
+  "name": "cloudnova-backend",
+  "version": "1.0.0",
+  "description": "CloudNova Produktkatalog – REST-API (Tier 2)",
+  "main": "src/server.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "pg": "^8.16.0"
+  }
+}
