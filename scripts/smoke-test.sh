@@ -28,6 +28,10 @@ n=$(curl -s $BASE/api/products | grep -o '"count":[0-9]*' | cut -d: -f2)
 curl -s "$BASE/api/products?search=postgres" | grep -q "Managed Postgres"; check "Suche 'postgres' findet Nova Managed Postgres" $?
 n=$(curl -s "$BASE/api/products?search=zzzzzz" | grep -o '"count":[0-9]*' | cut -d: -f2)
 [ "$n" = "0" ]; check "Suche ohne Treffer liefert count 0" $?
+n=$(curl -s "$BASE/api/products?search=_" | grep -o '"count":[0-9]*' | cut -d: -f2)
+[ "$n" = "0" ]; check "Suche nach Platzhalter _ wird wörtlich behandelt (count 0)" $?
+n=$(curl -s "$BASE/api/products?search=%25" | grep -o '"count":[0-9]*' | cut -d: -f2)
+[ "$n" = "0" ]; check "Suche nach Platzhalter % wird wörtlich behandelt (count 0)" $?
 curl -s "$BASE/api/products?category=Storage" | grep -q '"category":"Storage"'; check "Kategorie-Filter funktioniert" $?
 [ "$(code $BASE/api/products/1)" = 200 ]; check "GET /api/products/1 HTTP 200" $?
 [ "$(code $BASE/api/products/99999)" = 404 ]; check "Unbekannte ID -> HTTP 404" $?
@@ -40,7 +44,7 @@ echo "== Datenbank & Sicherheit =="
 docker compose exec -T database pg_isready -U "$POSTGRES_USER" >/dev/null; check "PostgreSQL erreichbar (pg_isready)" $?
 c=$(docker compose exec -T database psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM products" | tr -d '\r')
 [ "${c:-0}" -ge 10 ]; check "Beispieldaten vorhanden ($c Zeilen)" $?
-docker inspect cloudnova-database-1 --format '{{json .HostConfig.PortBindings}}' | grep -qE '^(null|\{\})$'; check "Port 5432 ist NICHT auf dem Host veröffentlicht" $?
+docker inspect "$(docker compose ps -q database)" --format '{{json .HostConfig.PortBindings}}' | grep -qE '^(null|\{\})$'; check "Port 5432 ist NICHT auf dem Host veröffentlicht" $?
 (exec 3<>/dev/tcp/127.0.0.1/5432) 2>/dev/null; [ $? -ne 0 ]; check "Verbindung zu localhost:5432 schlägt fehl" $?
 docker compose exec -T database env PGPASSWORD="$APP_DB_PASSWORD" psql -U "$APP_DB_USER" -d "$POSTGRES_DB" -c "DELETE FROM products" 2>&1 | grep -qi "permission denied"; check "App-Benutzer darf NICHT löschen (Least Privilege)" $?
 docker network inspect cloudnova_database_net --format '{{.Internal}}' | grep -q true; check "database_net ist 'internal'" $?

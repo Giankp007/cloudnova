@@ -12,7 +12,7 @@ router.get('/', async (req, res, next) => {
     const params = [];
     const where = [];
     if (search) {
-      params.push(`%${search.replace(/[\%_]/g, '\$&')}%`);
+      params.push(`%${search.replace(/[\\%_]/g, '\\$&')}%`);
       where.push(`(name ILIKE $${params.length} OR description ILIKE $${params.length} OR category ILIKE $${params.length})`);
     }
     if (category) {
