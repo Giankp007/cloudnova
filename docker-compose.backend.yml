@@ -1,0 +1,31 @@
+# Im Projektordner neben .env und dem Verzeichnis backend/ ablegen.
+# Start: docker compose -f docker-compose.backend.yml up -d --build
+services:
+  backend:
+    build: ./backend
+    image: cloudnova/backend:1.0
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DB_HOST: ${DB_HOST:?DB_HOST fehlt in .env}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:?DB_NAME fehlt in .env}
+      DB_USER: ${DB_USER:?DB_USER fehlt in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Bestehendes DB-Passwort in .env eintragen}
+    ports:
+      - "${BACKEND_BIND:?Tailscale-IP des Backend-Rechners in .env eintragen}:${BACKEND_PORT:-3000}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 100
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 4s
+      retries: 3
+      start_period: 10s
