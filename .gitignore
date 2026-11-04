@@ -19,3 +19,7 @@ npm-debug.log*
 Thumbs.db
 .DS_Store
 docs/screenshots/*.tmp
+
+# Eigene PC-spezifische Env-Dateien (Variante B), nur die Vorlage bleibt im Repo
+.env.*
+!.env.example
